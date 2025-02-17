@@ -24,7 +24,7 @@ if not os.path.exists(PERSIST_DIR):
     else:
         raise FileNotFoundError(f"❌ {ZIP_FILE} not found! Please upload the zip file.")
 
-embedding = SentenceTransformerEmbeddings()
+embedding = SentenceTransformerEmbeddings("EleutherAI/gpt-neo-1.3B")
 vectordb = Chroma(persist_directory=PERSIST_DIR, embedding_function=embedding)
 
 # 🔹 Load Phi-2 model (Hugging Face)
