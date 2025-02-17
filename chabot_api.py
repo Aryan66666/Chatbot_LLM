@@ -27,7 +27,7 @@ embedding = SentenceTransformerEmbeddings()
 vectordb = Chroma(persist_directory=PERSIST_DIR, embedding_function=embedding)
 
 # 🔹 Load Phi-2 model (Hugging Face)
-model_name = "gpt2"
+model_name = "google/reformer-crime-and-punishment"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForCausalLM.from_pretrained(model_name)
 
