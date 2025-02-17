@@ -3,10 +3,10 @@ import zipfile
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from pydantic import BaseModel
-from langchain.chat_models import ChatOpenAI
-from langchain.embeddings import SentenceTransformerEmbeddings
-from langchain.vectorstores import Chroma
 from langchain.chains import RetrievalQA
+from langchain_community.chat_models import ChatOpenAI
+from langchain_community.embeddings import SentenceTransformerEmbeddings
+from langchain_community.vectorstores import Chroma
 
 load_dotenv()
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -26,7 +26,7 @@ if not os.path.exists(PERSIST_DIR):
     else:
         raise FileNotFoundError(f"❌ {ZIP_FILE} not found! Please upload the zip file.")
 
-embedding = SentenceTransformerEmbeddings()
+embedding = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
 vectordb = Chroma(persist_directory=PERSIST_DIR, embedding_function=embedding)
 
 llm = ChatOpenAI(
