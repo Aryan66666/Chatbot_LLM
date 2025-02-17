@@ -3,10 +3,10 @@ import os
 import zipfile
 from fastapi import FastAPI
 from pydantic import BaseModel
-from langchain.embeddings import SentenceTransformerEmbeddings
-from langchain.vectorstores import Chroma
+from langchain_community.embeddings import SentenceTransformerEmbeddings
+from langchain_community.vectorstores import Chroma
 from langchain.chains import RetrievalQA
-from langchain.llms import HuggingFacePipeline
+from langchain.llms.huggingface_pipeline import HuggingFacePipeline
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 
 app = FastAPI()
