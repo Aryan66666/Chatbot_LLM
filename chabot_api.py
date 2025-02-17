@@ -10,6 +10,7 @@ from langchain.llms import HuggingFacePipeline
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 
 app = FastAPI()
+port = int(os.getenv("PORT", 8000))
 
 PERSIST_DIR = "docs/chroma/"
 ZIP_FILE = "chroma.zip"
