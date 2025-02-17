@@ -1,23 +1,20 @@
+# -*- coding: utf-8 -*-
 import os
 import zipfile
-from dotenv import load_dotenv
 from fastapi import FastAPI
 from pydantic import BaseModel
+from langchain.embeddings import SentenceTransformerEmbeddings
+from langchain.vectorstores import Chroma
 from langchain.chains import RetrievalQA
-from langchain_community.chat_models import ChatOpenAI
-from langchain_community.embeddings import SentenceTransformerEmbeddings
-from langchain_community.vectorstores import Chroma
-
-load_dotenv()
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-if not OPENROUTER_API_KEY:
-    raise ValueError("❌ OPENROUTER_API_KEY not found! Set it in the .env file.")
+from langchain.llms import HuggingFacePipeline
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 
 app = FastAPI()
 
 PERSIST_DIR = "docs/chroma/"
 ZIP_FILE = "chroma.zip"
 
+# Ensure Chroma DB exists
 if not os.path.exists(PERSIST_DIR):
     if os.path.exists(ZIP_FILE):
         with zipfile.ZipFile(ZIP_FILE, "r") as zip_ref:
@@ -26,22 +23,35 @@ if not os.path.exists(PERSIST_DIR):
     else:
         raise FileNotFoundError(f"❌ {ZIP_FILE} not found! Please upload the zip file.")
 
-embedding = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
+embedding = SentenceTransformerEmbeddings()
 vectordb = Chroma(persist_directory=PERSIST_DIR, embedding_function=embedding)
 
-llm = ChatOpenAI(
-    openai_api_base="https://openrouter.ai/api/v1",
-    openai_api_key=OPENROUTER_API_KEY,  
-    model="deepseek/deepseek-r1-distill-llama-70b:free"
+# 🔹 Load Phi-2 model (Hugging Face)
+model_name = "gpt2"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForCausalLM.from_pretrained(model_name)
+
+# 🔹 Create a text-generation pipeline
+text_pipeline = pipeline("text-generation", model=model, tokenizer=tokenizer)
+
+# 🔹 Wrap it with HuggingFacePipeline for LangChain
+llm = HuggingFacePipeline(pipeline=text_pipeline)
+
+
+# 🔹 Set up the RetrievalQA chain correctly
+qa_chain = RetrievalQA.from_chain_type(
+    llm=llm,
+    retriever=vectordb.as_retriever()
 )
 
-retriever = vectordb.as_retriever()
-qa_chain = RetrievalQA.from_chain_type(llm, retriever=retriever)
-
+# Define request model for FastAPI
 class QuestionRequest(BaseModel):
     question: str
 
+# FastAPI POST route to handle the question and answer
 @app.post("/ask")
 def ask_question(request: QuestionRequest):
+    # Get the answer from the RetrievalQA chain
     answer = qa_chain.run(request.question)
+
     return {"question": request.question, "answer": answer}
