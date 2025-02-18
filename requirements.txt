@@ -1,9 +1,10 @@
-fastapi
-uvicorn
-gunicorn
+Flask
+flask-cors
+transformers
+torch
 langchain
+langchain_huggingface
+langchain_community
 chromadb
 sentence-transformers
-openai
-pydantic
-langchain-community
+zipfile36 
