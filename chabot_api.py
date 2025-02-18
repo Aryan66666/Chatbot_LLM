@@ -28,7 +28,7 @@ embedding = SentenceTransformerEmbeddings(model_name="EleutherAI/gpt-neo-1.3B")
 vectordb = Chroma(persist_directory=PERSIST_DIR, embedding_function=embedding)
 
 # 🔹 Load Phi-2 model (Hugging Face)
-model_name = "google/reformer-crime-and-punishment"
+model_name = "EleutherAI/pythia-70m"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForCausalLM.from_pretrained(model_name)
 
