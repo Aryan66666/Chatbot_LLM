@@ -1,16 +1,19 @@
-# -*- coding: utf-8 -*-
+from flask import Flask, request, jsonify
+from flask_cors import CORS  # Import CORS
 import os
 import zipfile
-from fastapi import FastAPI
-from pydantic import BaseModel
-from langchain_community.embeddings import SentenceTransformerEmbeddings
-from langchain_community.vectorstores import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings, HuggingFacePipeline
+from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM, AutoModelForCausalLM   # Correct model type for T5
+from langchain.docstore.document import Document
+from langchain.vectorstores import Chroma
+from langchain.embeddings import SentenceTransformerEmbeddings
 from langchain.chains import RetrievalQA
-from langchain.llms.huggingface_pipeline import HuggingFacePipeline
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 
-app = FastAPI()
-port = int(os.getenv("PORT", 8000))
+
+app = Flask(__name__)
+
+# Enable CORS for all routes
+CORS(app)  # This will allow all domains to access your API
 
 PERSIST_DIR = "docs/chroma/"
 ZIP_FILE = "chroma.zip"
@@ -24,35 +27,48 @@ if not os.path.exists(PERSIST_DIR):
     else:
         raise FileNotFoundError(f"❌ {ZIP_FILE} not found! Please upload the zip file.")
 
-embedding = SentenceTransformerEmbeddings(model_name="EleutherAI/gpt-neo-1.3B")
+# Initialize the tokenizer and set the pad_token if not already set
+tokenizer = AutoTokenizer.from_pretrained('distilgpt2')
+
+# Initialize the model for sequence-to-sequence tasks
+model = AutoModelForCausalLM.from_pretrained('distilgpt2')
+
+# Resize token embeddings if the tokenizer has been updated
+model.resize_token_embeddings(len(tokenizer))
+
+# Initialize embeddings with the model
+embedding = SentenceTransformerEmbeddings()
+
+# Initialize the HuggingFace text generation model
+generator = pipeline('text2text-generation', model=model, tokenizer=tokenizer)
+
+# Create the HuggingFacePipeline
+llm = HuggingFacePipeline(pipeline=generator)
+
+# Initialize the Chroma vector store with the pre-existing persisted data
 vectordb = Chroma(persist_directory=PERSIST_DIR, embedding_function=embedding)
 
-# 🔹 Load Phi-2 model (Hugging Face)
-model_name = "EleutherAI/pythia-70m"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForCausalLM.from_pretrained(model_name)
+# Define the API route for question answering
+@app.route('/ask', methods=['POST'])
+def ask_question():
+    # Get the question from the API request
+    data = request.get_json()
+    question = data.get('question', '')
 
-# 🔹 Create a text-generation pipeline
-text_pipeline = pipeline("text-generation", model=model, tokenizer=tokenizer)
+    if not question:
+        return jsonify({"error": "No question provided"}), 400
 
-# 🔹 Wrap it with HuggingFacePipeline for LangChain
-llm = HuggingFacePipeline(pipeline=text_pipeline)
+    # Use the loaded vector store and create the QA chain
+    qa_chain = RetrievalQA.from_chain_type(
+        llm,
+        retriever=vectordb.as_retriever()
+    )
+
+    # Get the result from the QA chain
+    result = qa_chain({"query": question})  # Changed from invoke() to run()
+
+    return jsonify({"result": result['result']})
 
 
-# 🔹 Set up the RetrievalQA chain correctly
-qa_chain = RetrievalQA.from_chain_type(
-    llm=llm,
-    retriever=vectordb.as_retriever()
-)
-
-# Define request model for FastAPI
-class QuestionRequest(BaseModel):
-    question: str
-
-# FastAPI POST route to handle the question and answer
-@app.post("/ask")
-def ask_question(request: QuestionRequest):
-    # Get the answer from the RetrievalQA chain
-    answer = qa_chain.run(request.question)
-
-    return {"question": request.question, "answer": answer}
+if __name__ == '__main__':
+    app.run(debug=False)
